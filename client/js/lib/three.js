@@ -35329,4 +35329,1748 @@ THREE.MorphBlendMesh.prototype.autoCreateAnimations = function ( fps ) {
 
 };
 
-THREE.MorphBlendMesh.prototype.setAnimationDirectionForward = f
+THREE.MorphBlendMesh.prototype.setAnimationDirectionForward = function ( name ) {
+
+	var animation = this.animationsMap[ name ];
+
+	if ( animation ) {
+
+		animation.direction = 1;
+		animation.directionBackwards = false;
+
+	}
+
+};
+
+THREE.MorphBlendMesh.prototype.setAnimationDirectionBackward = function ( name ) {
+
+	var animation = this.animationsMap[ name ];
+
+	if ( animation ) {
+
+		animation.direction = -1;
+		animation.directionBackwards = true;
+
+	}
+
+};
+
+THREE.MorphBlendMesh.prototype.setAnimationFPS = function ( name, fps ) {
+
+	var animation = this.animationsMap[ name ];
+
+	if ( animation ) {
+
+		animation.fps = fps;
+		animation.duration = ( animation.end - animation.start ) / animation.fps;
+
+	}
+
+};
+
+THREE.MorphBlendMesh.prototype.setAnimationDuration = function ( name, duration ) {
+
+	var animation = this.animationsMap[ name ];
+
+	if ( animation ) {
+
+		animation.duration = duration;
+		animation.fps = ( animation.end - animation.start ) / animation.duration;
+
+	}
+
+};
+
+THREE.MorphBlendMesh.prototype.setAnimationWeight = function ( name, weight ) {
+
+	var animation = this.animationsMap[ name ];
+
+	if ( animation ) {
+
+		animation.weight = weight;
+
+	}
+
+};
+
+THREE.MorphBlendMesh.prototype.setAnimationTime = function ( name, time ) {
+
+	var animation = this.animationsMap[ name ];
+
+	if ( animation ) {
+
+		animation.time = time;
+
+	}
+
+};
+
+THREE.MorphBlendMesh.prototype.getAnimationTime = function ( name ) {
+
+	var time = 0;
+
+	var animation = this.animationsMap[ name ];
+
+	if ( animation ) {
+
+		time = animation.time;
+
+	}
+
+	return time;
+
+};
+
+THREE.MorphBlendMesh.prototype.getAnimationDuration = function ( name ) {
+
+	var duration = -1;
+
+	var animation = this.animationsMap[ name ];
+
+	if ( animation ) {
+
+		duration = animation.duration;
+
+	}
+
+	return duration;
+
+};
+
+THREE.MorphBlendMesh.prototype.playAnimation = function ( name ) {
+
+	var animation = this.animationsMap[ name ];
+
+	if ( animation ) {
+
+		animation.time = 0;
+		animation.active = true;
+
+	} else {
+
+		console.warn( "animation[" + name + "] undefined" );
+
+	}
+
+};
+
+THREE.MorphBlendMesh.prototype.stopAnimation = function ( name ) {
+
+	var animation = this.animationsMap[ name ];
+
+	if ( animation ) {
+
+		animation.active = false;
+
+	}
+
+};
+
+THREE.MorphBlendMesh.prototype.update = function ( delta ) {
+
+	for ( var i = 0, il = this.animationsList.length; i < il; i ++ ) {
+
+		var animation = this.animationsList[ i ];
+
+		if ( ! animation.active ) continue;
+
+		var frameTime = animation.duration / animation.length;
+
+		animation.time += animation.direction * delta;
+
+		if ( animation.mirroredLoop ) {
+
+			if ( animation.time > animation.duration || animation.time < 0 ) {
+
+				animation.direction *= -1;
+
+				if ( animation.time > animation.duration ) {
+
+					animation.time = animation.duration;
+					animation.directionBackwards = true;
+
+				}
+
+				if ( animation.time < 0 ) {
+
+					animation.time = 0;
+					animation.directionBackwards = false;
+
+				}
+
+			}
+
+		} else {
+
+			animation.time = animation.time % animation.duration;
+
+			if ( animation.time < 0 ) animation.time += animation.duration;
+
+		}
+
+		var keyframe = animation.startFrame + THREE.Math.clamp( Math.floor( animation.time / frameTime ), 0, animation.length - 1 );
+		var weight = animation.weight;
+
+		if ( keyframe !== animation.currentFrame ) {
+
+			this.morphTargetInfluences[ animation.lastFrame ] = 0;
+			this.morphTargetInfluences[ animation.currentFrame ] = 1 * weight;
+
+			this.morphTargetInfluences[ keyframe ] = 0;
+
+			animation.lastFrame = animation.currentFrame;
+			animation.currentFrame = keyframe;
+
+		}
+
+		var mix = ( animation.time % frameTime ) / frameTime;
+
+		if ( animation.directionBackwards ) mix = 1 - mix;
+
+		this.morphTargetInfluences[ animation.currentFrame ] = mix * weight;
+		this.morphTargetInfluences[ animation.lastFrame ] = ( 1 - mix ) * weight;
+
+	}
+
+};
+
+/**
+ * @author mikael emtinger / http://gomo.se/
+ * @author alteredq / http://alteredqualia.com/
+ */
+
+THREE.LensFlarePlugin = function () {
+
+	var _gl, _renderer, _precision, _lensFlare = {};
+
+	this.init = function ( renderer ) {
+
+		_gl = renderer.context;
+		_renderer = renderer;
+
+		_precision = renderer.getPrecision();
+
+		_lensFlare.vertices = new Float32Array( 8 + 8 );
+		_lensFlare.faces = new Uint16Array( 6 );
+
+		var i = 0;
+		_lensFlare.vertices[ i++ ] = -1; _lensFlare.vertices[ i++ ] = -1;	// vertex
+		_lensFlare.vertices[ i++ ] = 0;  _lensFlare.vertices[ i++ ] = 0;	// uv... etc.
+
+		_lensFlare.vertices[ i++ ] = 1;  _lensFlare.vertices[ i++ ] = -1;
+		_lensFlare.vertices[ i++ ] = 1;  _lensFlare.vertices[ i++ ] = 0;
+
+		_lensFlare.vertices[ i++ ] = 1;  _lensFlare.vertices[ i++ ] = 1;
+		_lensFlare.vertices[ i++ ] = 1;  _lensFlare.vertices[ i++ ] = 1;
+
+		_lensFlare.vertices[ i++ ] = -1; _lensFlare.vertices[ i++ ] = 1;
+		_lensFlare.vertices[ i++ ] = 0;  _lensFlare.vertices[ i++ ] = 1;
+
+		i = 0;
+		_lensFlare.faces[ i++ ] = 0; _lensFlare.faces[ i++ ] = 1; _lensFlare.faces[ i++ ] = 2;
+		_lensFlare.faces[ i++ ] = 0; _lensFlare.faces[ i++ ] = 2; _lensFlare.faces[ i++ ] = 3;
+
+		// buffers
+
+		_lensFlare.vertexBuffer     = _gl.createBuffer();
+		_lensFlare.elementBuffer    = _gl.createBuffer();
+
+		_gl.bindBuffer( _gl.ARRAY_BUFFER, _lensFlare.vertexBuffer );
+		_gl.bufferData( _gl.ARRAY_BUFFER, _lensFlare.vertices, _gl.STATIC_DRAW );
+
+		_gl.bindBuffer( _gl.ELEMENT_ARRAY_BUFFER, _lensFlare.elementBuffer );
+		_gl.bufferData( _gl.ELEMENT_ARRAY_BUFFER, _lensFlare.faces, _gl.STATIC_DRAW );
+
+		// textures
+
+		_lensFlare.tempTexture      = _gl.createTexture();
+		_lensFlare.occlusionTexture = _gl.createTexture();
+
+		_gl.bindTexture( _gl.TEXTURE_2D, _lensFlare.tempTexture );
+		_gl.texImage2D( _gl.TEXTURE_2D, 0, _gl.RGB, 16, 16, 0, _gl.RGB, _gl.UNSIGNED_BYTE, null );
+		_gl.texParameteri( _gl.TEXTURE_2D, _gl.TEXTURE_WRAP_S, _gl.CLAMP_TO_EDGE );
+		_gl.texParameteri( _gl.TEXTURE_2D, _gl.TEXTURE_WRAP_T, _gl.CLAMP_TO_EDGE );
+		_gl.texParameteri( _gl.TEXTURE_2D, _gl.TEXTURE_MAG_FILTER, _gl.NEAREST );
+		_gl.texParameteri( _gl.TEXTURE_2D, _gl.TEXTURE_MIN_FILTER, _gl.NEAREST );
+
+		_gl.bindTexture( _gl.TEXTURE_2D, _lensFlare.occlusionTexture );
+		_gl.texImage2D( _gl.TEXTURE_2D, 0, _gl.RGBA, 16, 16, 0, _gl.RGBA, _gl.UNSIGNED_BYTE, null );
+		_gl.texParameteri( _gl.TEXTURE_2D, _gl.TEXTURE_WRAP_S, _gl.CLAMP_TO_EDGE );
+		_gl.texParameteri( _gl.TEXTURE_2D, _gl.TEXTURE_WRAP_T, _gl.CLAMP_TO_EDGE );
+		_gl.texParameteri( _gl.TEXTURE_2D, _gl.TEXTURE_MAG_FILTER, _gl.NEAREST );
+		_gl.texParameteri( _gl.TEXTURE_2D, _gl.TEXTURE_MIN_FILTER, _gl.NEAREST );
+
+		if ( _gl.getParameter( _gl.MAX_VERTEX_TEXTURE_IMAGE_UNITS ) <= 0 ) {
+
+			_lensFlare.hasVertexTexture = false;
+			_lensFlare.program = createProgram( THREE.ShaderFlares[ "lensFlare" ], _precision );
+
+		} else {
+
+			_lensFlare.hasVertexTexture = true;
+			_lensFlare.program = createProgram( THREE.ShaderFlares[ "lensFlareVertexTexture" ], _precision );
+
+		}
+
+		_lensFlare.attributes = {};
+		_lensFlare.uniforms = {};
+
+		_lensFlare.attributes.vertex       = _gl.getAttribLocation ( _lensFlare.program, "position" );
+		_lensFlare.attributes.uv           = _gl.getAttribLocation ( _lensFlare.program, "uv" );
+
+		_lensFlare.uniforms.renderType     = _gl.getUniformLocation( _lensFlare.program, "renderType" );
+		_lensFlare.uniforms.map            = _gl.getUniformLocation( _lensFlare.program, "map" );
+		_lensFlare.uniforms.occlusionMap   = _gl.getUniformLocation( _lensFlare.program, "occlusionMap" );
+		_lensFlare.uniforms.opacity        = _gl.getUniformLocation( _lensFlare.program, "opacity" );
+		_lensFlare.uniforms.color          = _gl.getUniformLocation( _lensFlare.program, "color" );
+		_lensFlare.uniforms.scale          = _gl.getUniformLocation( _lensFlare.program, "scale" );
+		_lensFlare.uniforms.rotation       = _gl.getUniformLocation( _lensFlare.program, "rotation" );
+		_lensFlare.uniforms.screenPosition = _gl.getUniformLocation( _lensFlare.program, "screenPosition" );
+
+	};
+
+
+	/*
+	 * Render lens flares
+	 * Method: renders 16x16 0xff00ff-colored points scattered over the light source area,
+	 *         reads these back and calculates occlusion.
+	 *         Then _lensFlare.update_lensFlares() is called to re-position and
+	 *         update transparency of flares. Then they are rendered.
+	 *
+	 */
+
+	this.render = function ( scene, camera, viewportWidth, viewportHeight ) {
+
+		var flares = scene.__webglFlares,
+			nFlares = flares.length;
+
+		if ( ! nFlares ) return;
+
+		var tempPosition = new THREE.Vector3();
+
+		var invAspect = viewportHeight / viewportWidth,
+			halfViewportWidth = viewportWidth * 0.5,
+			halfViewportHeight = viewportHeight * 0.5;
+
+		var size = 16 / viewportHeight,
+			scale = new THREE.Vector2( size * invAspect, size );
+
+		var screenPosition = new THREE.Vector3( 1, 1, 0 ),
+			screenPositionPixels = new THREE.Vector2( 1, 1 );
+
+		var uniforms = _lensFlare.uniforms,
+			attributes = _lensFlare.attributes;
+
+		// set _lensFlare program and reset blending
+
+		_gl.useProgram( _lensFlare.program );
+
+		_gl.enableVertexAttribArray( _lensFlare.attributes.vertex );
+		_gl.enableVertexAttribArray( _lensFlare.attributes.uv );
+
+		// loop through all lens flares to update their occlusion and positions
+		// setup gl and common used attribs/unforms
+
+		_gl.uniform1i( uniforms.occlusionMap, 0 );
+		_gl.uniform1i( uniforms.map, 1 );
+
+		_gl.bindBuffer( _gl.ARRAY_BUFFER, _lensFlare.vertexBuffer );
+		_gl.vertexAttribPointer( attributes.vertex, 2, _gl.FLOAT, false, 2 * 8, 0 );
+		_gl.vertexAttribPointer( attributes.uv, 2, _gl.FLOAT, false, 2 * 8, 8 );
+
+		_gl.bindBuffer( _gl.ELEMENT_ARRAY_BUFFER, _lensFlare.elementBuffer );
+
+		_gl.disable( _gl.CULL_FACE );
+		_gl.depthMask( false );
+
+		var i, j, jl, flare, sprite;
+
+		for ( i = 0; i < nFlares; i ++ ) {
+
+			size = 16 / viewportHeight;
+			scale.set( size * invAspect, size );
+
+			// calc object screen position
+
+			flare = flares[ i ];
+
+			tempPosition.set( flare.matrixWorld.elements[12], flare.matrixWorld.elements[13], flare.matrixWorld.elements[14] );
+
+			tempPosition.applyMatrix4( camera.matrixWorldInverse );
+			tempPosition.applyProjection( camera.projectionMatrix );
+
+			// setup arrays for gl programs
+
+			screenPosition.copy( tempPosition )
+
+			screenPositionPixels.x = screenPosition.x * halfViewportWidth + halfViewportWidth;
+			screenPositionPixels.y = screenPosition.y * halfViewportHeight + halfViewportHeight;
+
+			// screen cull
+
+			if ( _lensFlare.hasVertexTexture || (
+				screenPositionPixels.x > 0 &&
+				screenPositionPixels.x < viewportWidth &&
+				screenPositionPixels.y > 0 &&
+				screenPositionPixels.y < viewportHeight ) ) {
+
+				// save current RGB to temp texture
+
+				_gl.activeTexture( _gl.TEXTURE1 );
+				_gl.bindTexture( _gl.TEXTURE_2D, _lensFlare.tempTexture );
+				_gl.copyTexImage2D( _gl.TEXTURE_2D, 0, _gl.RGB, screenPositionPixels.x - 8, screenPositionPixels.y - 8, 16, 16, 0 );
+
+
+				// render pink quad
+
+				_gl.uniform1i( uniforms.renderType, 0 );
+				_gl.uniform2f( uniforms.scale, scale.x, scale.y );
+				_gl.uniform3f( uniforms.screenPosition, screenPosition.x, screenPosition.y, screenPosition.z );
+
+				_gl.disable( _gl.BLEND );
+				_gl.enable( _gl.DEPTH_TEST );
+
+				_gl.drawElements( _gl.TRIANGLES, 6, _gl.UNSIGNED_SHORT, 0 );
+
+
+				// copy result to occlusionMap
+
+				_gl.activeTexture( _gl.TEXTURE0 );
+				_gl.bindTexture( _gl.TEXTURE_2D, _lensFlare.occlusionTexture );
+				_gl.copyTexImage2D( _gl.TEXTURE_2D, 0, _gl.RGBA, screenPositionPixels.x - 8, screenPositionPixels.y - 8, 16, 16, 0 );
+
+
+				// restore graphics
+
+				_gl.uniform1i( uniforms.renderType, 1 );
+				_gl.disable( _gl.DEPTH_TEST );
+
+				_gl.activeTexture( _gl.TEXTURE1 );
+				_gl.bindTexture( _gl.TEXTURE_2D, _lensFlare.tempTexture );
+				_gl.drawElements( _gl.TRIANGLES, 6, _gl.UNSIGNED_SHORT, 0 );
+
+
+				// update object positions
+
+				flare.positionScreen.copy( screenPosition )
+
+				if ( flare.customUpdateCallback ) {
+
+					flare.customUpdateCallback( flare );
+
+				} else {
+
+					flare.updateLensFlares();
+
+				}
+
+				// render flares
+
+				_gl.uniform1i( uniforms.renderType, 2 );
+				_gl.enable( _gl.BLEND );
+
+				for ( j = 0, jl = flare.lensFlares.length; j < jl; j ++ ) {
+
+					sprite = flare.lensFlares[ j ];
+
+					if ( sprite.opacity > 0.001 && sprite.scale > 0.001 ) {
+
+						screenPosition.x = sprite.x;
+						screenPosition.y = sprite.y;
+						screenPosition.z = sprite.z;
+
+						size = sprite.size * sprite.scale / viewportHeight;
+
+						scale.x = size * invAspect;
+						scale.y = size;
+
+						_gl.uniform3f( uniforms.screenPosition, screenPosition.x, screenPosition.y, screenPosition.z );
+						_gl.uniform2f( uniforms.scale, scale.x, scale.y );
+						_gl.uniform1f( uniforms.rotation, sprite.rotation );
+
+						_gl.uniform1f( uniforms.opacity, sprite.opacity );
+						_gl.uniform3f( uniforms.color, sprite.color.r, sprite.color.g, sprite.color.b );
+
+						_renderer.setBlending( sprite.blending, sprite.blendEquation, sprite.blendSrc, sprite.blendDst );
+						_renderer.setTexture( sprite.texture, 1 );
+
+						_gl.drawElements( _gl.TRIANGLES, 6, _gl.UNSIGNED_SHORT, 0 );
+
+					}
+
+				}
+
+			}
+
+		}
+
+		// restore gl
+
+		_gl.enable( _gl.CULL_FACE );
+		_gl.enable( _gl.DEPTH_TEST );
+		_gl.depthMask( true );
+
+	};
+
+	function createProgram ( shader, precision ) {
+
+		var program = _gl.createProgram();
+
+		var fragmentShader = _gl.createShader( _gl.FRAGMENT_SHADER );
+		var vertexShader = _gl.createShader( _gl.VERTEX_SHADER );
+
+		var prefix = "precision " + precision + " float;\n";
+
+		_gl.shaderSource( fragmentShader, prefix + shader.fragmentShader );
+		_gl.shaderSource( vertexShader, prefix + shader.vertexShader );
+
+		_gl.compileShader( fragmentShader );
+		_gl.compileShader( vertexShader );
+
+		_gl.attachShader( program, fragmentShader );
+		_gl.attachShader( program, vertexShader );
+
+		_gl.linkProgram( program );
+
+		return program;
+
+	};
+
+};
+
+/**
+ * @author alteredq / http://alteredqualia.com/
+ */
+
+THREE.ShadowMapPlugin = function () {
+
+	var _gl,
+	_renderer,
+	_depthMaterial, _depthMaterialMorph, _depthMaterialSkin, _depthMaterialMorphSkin,
+
+	_frustum = new THREE.Frustum(),
+	_projScreenMatrix = new THREE.Matrix4(),
+
+	_min = new THREE.Vector3(),
+	_max = new THREE.Vector3(),
+
+	_matrixPosition = new THREE.Vector3();
+
+	this.init = function ( renderer ) {
+
+		_gl = renderer.context;
+		_renderer = renderer;
+
+		var depthShader = THREE.ShaderLib[ "depthRGBA" ];
+		var depthUniforms = THREE.UniformsUtils.clone( depthShader.uniforms );
+
+		_depthMaterial = new THREE.ShaderMaterial( { fragmentShader: depthShader.fragmentShader, vertexShader: depthShader.vertexShader, uniforms: depthUniforms } );
+		_depthMaterialMorph = new THREE.ShaderMaterial( { fragmentShader: depthShader.fragmentShader, vertexShader: depthShader.vertexShader, uniforms: depthUniforms, morphTargets: true } );
+		_depthMaterialSkin = new THREE.ShaderMaterial( { fragmentShader: depthShader.fragmentShader, vertexShader: depthShader.vertexShader, uniforms: depthUniforms, skinning: true } );
+		_depthMaterialMorphSkin = new THREE.ShaderMaterial( { fragmentShader: depthShader.fragmentShader, vertexShader: depthShader.vertexShader, uniforms: depthUniforms, morphTargets: true, skinning: true } );
+
+		_depthMaterial._shadowPass = true;
+		_depthMaterialMorph._shadowPass = true;
+		_depthMaterialSkin._shadowPass = true;
+		_depthMaterialMorphSkin._shadowPass = true;
+
+	};
+
+	this.render = function ( scene, camera ) {
+
+		if ( ! ( _renderer.shadowMapEnabled && _renderer.shadowMapAutoUpdate ) ) return;
+
+		this.update( scene, camera );
+
+	};
+
+	this.update = function ( scene, camera ) {
+
+		var i, il, j, jl, n,
+
+		shadowMap, shadowMatrix, shadowCamera,
+		program, buffer, material,
+		webglObject, object, light,
+		renderList,
+
+		lights = [],
+		k = 0,
+
+		fog = null;
+
+		// set GL state for depth map
+
+		_gl.clearColor( 1, 1, 1, 1 );
+		_gl.disable( _gl.BLEND );
+
+		_gl.enable( _gl.CULL_FACE );
+		_gl.frontFace( _gl.CCW );
+
+		if ( _renderer.shadowMapCullFace === THREE.CullFaceFront ) {
+
+			_gl.cullFace( _gl.FRONT );
+
+		} else {
+
+			_gl.cullFace( _gl.BACK );
+
+		}
+
+		_renderer.setDepthTest( true );
+
+		// preprocess lights
+		// 	- skip lights that are not casting shadows
+		//	- create virtual lights for cascaded shadow maps
+
+		for ( i = 0, il = scene.__lights.length; i < il; i ++ ) {
+
+			light = scene.__lights[ i ];
+
+			if ( ! light.castShadow ) continue;
+
+			if ( ( light instanceof THREE.DirectionalLight ) && light.shadowCascade ) {
+
+				for ( n = 0; n < light.shadowCascadeCount; n ++ ) {
+
+					var virtualLight;
+
+					if ( ! light.shadowCascadeArray[ n ] ) {
+
+						virtualLight = createVirtualLight( light, n );
+						virtualLight.originalCamera = camera;
+
+						var gyro = new THREE.Gyroscope();
+						gyro.position = light.shadowCascadeOffset;
+
+						gyro.add( virtualLight );
+						gyro.add( virtualLight.target );
+
+						camera.add( gyro );
+
+						light.shadowCascadeArray[ n ] = virtualLight;
+
+						console.log( "Created virtualLight", virtualLight );
+
+					} else {
+
+						virtualLight = light.shadowCascadeArray[ n ];
+
+					}
+
+					updateVirtualLight( light, n );
+
+					lights[ k ] = virtualLight;
+					k ++;
+
+				}
+
+			} else {
+
+				lights[ k ] = light;
+				k ++;
+
+			}
+
+		}
+
+		// render depth map
+
+		for ( i = 0, il = lights.length; i < il; i ++ ) {
+
+			light = lights[ i ];
+
+			if ( ! light.shadowMap ) {
+
+				var shadowFilter = THREE.LinearFilter;
+
+				if ( _renderer.shadowMapType === THREE.PCFSoftShadowMap ) {
+
+					shadowFilter = THREE.NearestFilter;
+
+				}
+
+				var pars = { minFilter: shadowFilter, magFilter: shadowFilter, format: THREE.RGBAFormat };
+
+				light.shadowMap = new THREE.WebGLRenderTarget( light.shadowMapWidth, light.shadowMapHeight, pars );
+				light.shadowMapSize = new THREE.Vector2( light.shadowMapWidth, light.shadowMapHeight );
+
+				light.shadowMatrix = new THREE.Matrix4();
+
+			}
+
+			if ( ! light.shadowCamera ) {
+
+				if ( light instanceof THREE.SpotLight ) {
+
+					light.shadowCamera = new THREE.PerspectiveCamera( light.shadowCameraFov, light.shadowMapWidth / light.shadowMapHeight, light.shadowCameraNear, light.shadowCameraFar );
+
+				} else if ( light instanceof THREE.DirectionalLight ) {
+
+					light.shadowCamera = new THREE.OrthographicCamera( light.shadowCameraLeft, light.shadowCameraRight, light.shadowCameraTop, light.shadowCameraBottom, light.shadowCameraNear, light.shadowCameraFar );
+
+				} else {
+
+					console.error( "Unsupported light type for shadow" );
+					continue;
+
+				}
+
+				scene.add( light.shadowCamera );
+
+				if ( scene.autoUpdate === true ) scene.updateMatrixWorld();
+
+			}
+
+			if ( light.shadowCameraVisible && ! light.cameraHelper ) {
+
+				light.cameraHelper = new THREE.CameraHelper( light.shadowCamera );
+				light.shadowCamera.add( light.cameraHelper );
+
+			}
+
+			if ( light.isVirtual && virtualLight.originalCamera == camera ) {
+
+				updateShadowCamera( camera, light );
+
+			}
+
+			shadowMap = light.shadowMap;
+			shadowMatrix = light.shadowMatrix;
+			shadowCamera = light.shadowCamera;
+
+			shadowCamera.position.setFromMatrixPosition( light.matrixWorld );
+			_matrixPosition.setFromMatrixPosition( light.target.matrixWorld );
+			shadowCamera.lookAt( _matrixPosition );
+			shadowCamera.updateMatrixWorld();
+
+			shadowCamera.matrixWorldInverse.getInverse( shadowCamera.matrixWorld );
+
+			if ( light.cameraHelper ) light.cameraHelper.visible = light.shadowCameraVisible;
+			if ( light.shadowCameraVisible ) light.cameraHelper.update();
+
+			// compute shadow matrix
+
+			shadowMatrix.set( 0.5, 0.0, 0.0, 0.5,
+							  0.0, 0.5, 0.0, 0.5,
+							  0.0, 0.0, 0.5, 0.5,
+							  0.0, 0.0, 0.0, 1.0 );
+
+			shadowMatrix.multiply( shadowCamera.projectionMatrix );
+			shadowMatrix.multiply( shadowCamera.matrixWorldInverse );
+
+			// update camera matrices and frustum
+
+			_projScreenMatrix.multiplyMatrices( shadowCamera.projectionMatrix, shadowCamera.matrixWorldInverse );
+			_frustum.setFromMatrix( _projScreenMatrix );
+
+			// render shadow map
+
+			_renderer.setRenderTarget( shadowMap );
+			_renderer.clear();
+
+			// set object matrices & frustum culling
+
+			renderList = scene.__webglObjects;
+
+			for ( j = 0, jl = renderList.length; j < jl; j ++ ) {
+
+				webglObject = renderList[ j ];
+				object = webglObject.object;
+
+				webglObject.render = false;
+
+				if ( object.visible && object.castShadow ) {
+
+					if ( ! ( object instanceof THREE.Mesh || object instanceof THREE.ParticleSystem ) || ! ( object.frustumCulled ) || _frustum.intersectsObject( object ) ) {
+
+						object._modelViewMatrix.multiplyMatrices( shadowCamera.matrixWorldInverse, object.matrixWorld );
+
+						webglObject.render = true;
+
+					}
+
+				}
+
+			}
+
+			// render regular objects
+
+			var objectMaterial, useMorphing, useSkinning;
+
+			for ( j = 0, jl = renderList.length; j < jl; j ++ ) {
+
+				webglObject = renderList[ j ];
+
+				if ( webglObject.render ) {
+
+					object = webglObject.object;
+					buffer = webglObject.buffer;
+
+					// culling is overriden globally for all objects
+					// while rendering depth map
+
+					// need to deal with MeshFaceMaterial somehow
+					// in that case just use the first of material.materials for now
+					// (proper solution would require to break objects by materials
+					//  similarly to regular rendering and then set corresponding
+					//  depth materials per each chunk instead of just once per object)
+
+					objectMaterial = getObjectMaterial( object );
+
+					useMorphing = object.geometry.morphTargets.length > 0 && objectMaterial.morphTargets;
+					useSkinning = object instanceof THREE.SkinnedMesh && objectMaterial.skinning;
+
+					if ( object.customDepthMaterial ) {
+
+						material = object.customDepthMaterial;
+
+					} else if ( useSkinning ) {
+
+						material = useMorphing ? _depthMaterialMorphSkin : _depthMaterialSkin;
+
+					} else if ( useMorphing ) {
+
+						material = _depthMaterialMorph;
+
+					} else {
+
+						material = _depthMaterial;
+
+					}
+
+					if ( buffer instanceof THREE.BufferGeometry ) {
+
+						_renderer.renderBufferDirect( shadowCamera, scene.__lights, fog, material, buffer, object );
+
+					} else {
+
+						_renderer.renderBuffer( shadowCamera, scene.__lights, fog, material, buffer, object );
+
+					}
+
+				}
+
+			}
+
+			// set matrices and render immediate objects
+
+			renderList = scene.__webglObjectsImmediate;
+
+			for ( j = 0, jl = renderList.length; j < jl; j ++ ) {
+
+				webglObject = renderList[ j ];
+				object = webglObject.object;
+
+				if ( object.visible && object.castShadow ) {
+
+					object._modelViewMatrix.multiplyMatrices( shadowCamera.matrixWorldInverse, object.matrixWorld );
+
+					_renderer.renderImmediateObject( shadowCamera, scene.__lights, fog, _depthMaterial, object );
+
+				}
+
+			}
+
+		}
+
+		// restore GL state
+
+		var clearColor = _renderer.getClearColor(),
+		clearAlpha = _renderer.getClearAlpha();
+
+		_gl.clearColor( clearColor.r, clearColor.g, clearColor.b, clearAlpha );
+		_gl.enable( _gl.BLEND );
+
+		if ( _renderer.shadowMapCullFace === THREE.CullFaceFront ) {
+
+			_gl.cullFace( _gl.BACK );
+
+		}
+
+	};
+
+	function createVirtualLight( light, cascade ) {
+
+		var virtualLight = new THREE.DirectionalLight();
+
+		virtualLight.isVirtual = true;
+
+		virtualLight.onlyShadow = true;
+		virtualLight.castShadow = true;
+
+		virtualLight.shadowCameraNear = light.shadowCameraNear;
+		virtualLight.shadowCameraFar = light.shadowCameraFar;
+
+		virtualLight.shadowCameraLeft = light.shadowCameraLeft;
+		virtualLight.shadowCameraRight = light.shadowCameraRight;
+		virtualLight.shadowCameraBottom = light.shadowCameraBottom;
+		virtualLight.shadowCameraTop = light.shadowCameraTop;
+
+		virtualLight.shadowCameraVisible = light.shadowCameraVisible;
+
+		virtualLight.shadowDarkness = light.shadowDarkness;
+
+		virtualLight.shadowBias = light.shadowCascadeBias[ cascade ];
+		virtualLight.shadowMapWidth = light.shadowCascadeWidth[ cascade ];
+		virtualLight.shadowMapHeight = light.shadowCascadeHeight[ cascade ];
+
+		virtualLight.pointsWorld = [];
+		virtualLight.pointsFrustum = [];
+
+		var pointsWorld = virtualLight.pointsWorld,
+			pointsFrustum = virtualLight.pointsFrustum;
+
+		for ( var i = 0; i < 8; i ++ ) {
+
+			pointsWorld[ i ] = new THREE.Vector3();
+			pointsFrustum[ i ] = new THREE.Vector3();
+
+		}
+
+		var nearZ = light.shadowCascadeNearZ[ cascade ];
+		var farZ = light.shadowCascadeFarZ[ cascade ];
+
+		pointsFrustum[ 0 ].set( -1, -1, nearZ );
+		pointsFrustum[ 1 ].set(  1, -1, nearZ );
+		pointsFrustum[ 2 ].set( -1,  1, nearZ );
+		pointsFrustum[ 3 ].set(  1,  1, nearZ );
+
+		pointsFrustum[ 4 ].set( -1, -1, farZ );
+		pointsFrustum[ 5 ].set(  1, -1, farZ );
+		pointsFrustum[ 6 ].set( -1,  1, farZ );
+		pointsFrustum[ 7 ].set(  1,  1, farZ );
+
+		return virtualLight;
+
+	}
+
+	// Synchronize virtual light with the original light
+
+	function updateVirtualLight( light, cascade ) {
+
+		var virtualLight = light.shadowCascadeArray[ cascade ];
+
+		virtualLight.position.copy( light.position );
+		virtualLight.target.position.copy( light.target.position );
+		virtualLight.lookAt( virtualLight.target );
+
+		virtualLight.shadowCameraVisible = light.shadowCameraVisible;
+		virtualLight.shadowDarkness = light.shadowDarkness;
+
+		virtualLight.shadowBias = light.shadowCascadeBias[ cascade ];
+
+		var nearZ = light.shadowCascadeNearZ[ cascade ];
+		var farZ = light.shadowCascadeFarZ[ cascade ];
+
+		var pointsFrustum = virtualLight.pointsFrustum;
+
+		pointsFrustum[ 0 ].z = nearZ;
+		pointsFrustum[ 1 ].z = nearZ;
+		pointsFrustum[ 2 ].z = nearZ;
+		pointsFrustum[ 3 ].z = nearZ;
+
+		pointsFrustum[ 4 ].z = farZ;
+		pointsFrustum[ 5 ].z = farZ;
+		pointsFrustum[ 6 ].z = farZ;
+		pointsFrustum[ 7 ].z = farZ;
+
+	}
+
+	// Fit shadow camera's ortho frustum to camera frustum
+
+	function updateShadowCamera( camera, light ) {
+
+		var shadowCamera = light.shadowCamera,
+			pointsFrustum = light.pointsFrustum,
+			pointsWorld = light.pointsWorld;
+
+		_min.set( Infinity, Infinity, Infinity );
+		_max.set( -Infinity, -Infinity, -Infinity );
+
+		for ( var i = 0; i < 8; i ++ ) {
+
+			var p = pointsWorld[ i ];
+
+			p.copy( pointsFrustum[ i ] );
+			THREE.ShadowMapPlugin.__projector.unprojectVector( p, camera );
+
+			p.applyMatrix4( shadowCamera.matrixWorldInverse );
+
+			if ( p.x < _min.x ) _min.x = p.x;
+			if ( p.x > _max.x ) _max.x = p.x;
+
+			if ( p.y < _min.y ) _min.y = p.y;
+			if ( p.y > _max.y ) _max.y = p.y;
+
+			if ( p.z < _min.z ) _min.z = p.z;
+			if ( p.z > _max.z ) _max.z = p.z;
+
+		}
+
+		shadowCamera.left = _min.x;
+		shadowCamera.right = _max.x;
+		shadowCamera.top = _max.y;
+		shadowCamera.bottom = _min.y;
+
+		// can't really fit near/far
+		//shadowCamera.near = _min.z;
+		//shadowCamera.far = _max.z;
+
+		shadowCamera.updateProjectionMatrix();
+
+	}
+
+	// For the moment just ignore objects that have multiple materials with different animation methods
+	// Only the first material will be taken into account for deciding which depth material to use for shadow maps
+
+	function getObjectMaterial( object ) {
+
+		return object.material instanceof THREE.MeshFaceMaterial
+			? object.material.materials[ 0 ]
+			: object.material;
+
+	};
+
+};
+
+THREE.ShadowMapPlugin.__projector = new THREE.Projector();
+
+/**
+ * @author mikael emtinger / http://gomo.se/
+ * @author alteredq / http://alteredqualia.com/
+ */
+
+THREE.SpritePlugin = function () {
+
+	var _gl, _renderer, _texture;
+
+	var vertices, faces, vertexBuffer, elementBuffer;
+	var program, attributes, uniforms;
+
+	this.init = function ( renderer ) {
+
+		_gl = renderer.context;
+		_renderer = renderer;
+
+		vertices = new Float32Array( [
+			- 0.5, - 0.5, 0, 0, 
+			  0.5, - 0.5, 1, 0,
+			  0.5,   0.5, 1, 1,
+			- 0.5,   0.5, 0, 1
+		] );
+
+		faces = new Uint16Array( [
+			0, 1, 2,
+			0, 2, 3
+		] );
+
+		vertexBuffer  = _gl.createBuffer();
+		elementBuffer = _gl.createBuffer();
+
+		_gl.bindBuffer( _gl.ARRAY_BUFFER, vertexBuffer );
+		_gl.bufferData( _gl.ARRAY_BUFFER, vertices, _gl.STATIC_DRAW );
+
+		_gl.bindBuffer( _gl.ELEMENT_ARRAY_BUFFER, elementBuffer );
+		_gl.bufferData( _gl.ELEMENT_ARRAY_BUFFER, faces, _gl.STATIC_DRAW );
+
+		program = createProgram();
+
+		attributes = {
+			position:			_gl.getAttribLocation ( program, 'position' ),
+			uv:					_gl.getAttribLocation ( program, 'uv' )
+		};
+
+		uniforms = {
+			uvOffset:			_gl.getUniformLocation( program, 'uvOffset' ),
+			uvScale:			_gl.getUniformLocation( program, 'uvScale' ),
+
+			rotation:			_gl.getUniformLocation( program, 'rotation' ),
+			scale:				_gl.getUniformLocation( program, 'scale' ),
+
+			color:				_gl.getUniformLocation( program, 'color' ),
+			map:				_gl.getUniformLocation( program, 'map' ),
+			opacity:			_gl.getUniformLocation( program, 'opacity' ),
+
+			modelViewMatrix: 	_gl.getUniformLocation( program, 'modelViewMatrix' ),
+			projectionMatrix:	_gl.getUniformLocation( program, 'projectionMatrix' ),
+
+			fogType:			_gl.getUniformLocation( program, 'fogType' ),
+			fogDensity:			_gl.getUniformLocation( program, 'fogDensity' ),
+			fogNear:			_gl.getUniformLocation( program, 'fogNear' ),
+			fogFar:				_gl.getUniformLocation( program, 'fogFar' ),
+			fogColor:			_gl.getUniformLocation( program, 'fogColor' ),
+
+			alphaTest:			_gl.getUniformLocation( program, 'alphaTest' )
+		};
+
+		var canvas = document.createElement( 'canvas' );
+		canvas.width = 8;
+		canvas.height = 8;
+
+		var context = canvas.getContext( '2d' );
+		context.fillStyle = '#ffffff';
+		context.fillRect( 0, 0, canvas.width, canvas.height );
+
+		_texture = new THREE.Texture( canvas );
+		_texture.needsUpdate = true;
+
+	};
+
+	this.render = function ( scene, camera, viewportWidth, viewportHeight ) {
+
+		var sprites = scene.__webglSprites,
+			nSprites = sprites.length;
+
+		if ( ! nSprites ) return;
+
+		// setup gl
+
+		_gl.useProgram( program );
+
+		_gl.enableVertexAttribArray( attributes.position );
+		_gl.enableVertexAttribArray( attributes.uv );
+
+		_gl.disable( _gl.CULL_FACE );
+		_gl.enable( _gl.BLEND );
+
+		_gl.bindBuffer( _gl.ARRAY_BUFFER, vertexBuffer );
+		_gl.vertexAttribPointer( attributes.position, 2, _gl.FLOAT, false, 2 * 8, 0 );
+		_gl.vertexAttribPointer( attributes.uv, 2, _gl.FLOAT, false, 2 * 8, 8 );
+
+		_gl.bindBuffer( _gl.ELEMENT_ARRAY_BUFFER, elementBuffer );
+
+		_gl.uniformMatrix4fv( uniforms.projectionMatrix, false, camera.projectionMatrix.elements );
+
+		_gl.activeTexture( _gl.TEXTURE0 );
+		_gl.uniform1i( uniforms.map, 0 );
+
+		var oldFogType = 0;
+		var sceneFogType = 0;
+		var fog = scene.fog;
+
+		if ( fog ) {
+
+			_gl.uniform3f( uniforms.fogColor, fog.color.r, fog.color.g, fog.color.b );
+
+			if ( fog instanceof THREE.Fog ) {
+
+				_gl.uniform1f( uniforms.fogNear, fog.near );
+				_gl.uniform1f( uniforms.fogFar, fog.far );
+
+				_gl.uniform1i( uniforms.fogType, 1 );
+				oldFogType = 1;
+				sceneFogType = 1;
+
+			} else if ( fog instanceof THREE.FogExp2 ) {
+
+				_gl.uniform1f( uniforms.fogDensity, fog.density );
+
+				_gl.uniform1i( uniforms.fogType, 2 );
+				oldFogType = 2;
+				sceneFogType = 2;
+
+			}
+
+		} else {
+
+			_gl.uniform1i( uniforms.fogType, 0 );
+			oldFogType = 0;
+			sceneFogType = 0;
+
+		}
+
+
+		// update positions and sort
+
+		var i, sprite, material, fogType, scale = [];
+
+		for( i = 0; i < nSprites; i ++ ) {
+
+			sprite = sprites[ i ];
+			material = sprite.material;
+
+			if ( sprite.visible === false ) continue;
+
+			sprite._modelViewMatrix.multiplyMatrices( camera.matrixWorldInverse, sprite.matrixWorld );
+			sprite.z = - sprite._modelViewMatrix.elements[ 14 ];
+
+		}
+
+		sprites.sort( painterSortStable );
+
+		// render all sprites
+
+		for( i = 0; i < nSprites; i ++ ) {
+
+			sprite = sprites[ i ];
+
+			if ( sprite.visible === false ) continue;
+
+			material = sprite.material;
+
+			_gl.uniform1f( uniforms.alphaTest, material.alphaTest );
+			_gl.uniformMatrix4fv( uniforms.modelViewMatrix, false, sprite._modelViewMatrix.elements );
+
+			scale[ 0 ] = sprite.scale.x;
+			scale[ 1 ] = sprite.scale.y;
+
+			if ( scene.fog && material.fog ) {
+
+				fogType = sceneFogType;
+
+			} else {
+
+				fogType = 0;
+
+			}
+
+			if ( oldFogType !== fogType ) {
+
+				_gl.uniform1i( uniforms.fogType, fogType );
+				oldFogType = fogType;
+
+			}
+
+			_gl.uniform2f( uniforms.uvScale, material.uvScale.x, material.uvScale.y );
+			_gl.uniform2f( uniforms.uvOffset, material.uvOffset.x, material.uvOffset.y );
+
+			_gl.uniform1f( uniforms.opacity, material.opacity );
+			_gl.uniform3f( uniforms.color, material.color.r, material.color.g, material.color.b );
+
+			_gl.uniform1f( uniforms.rotation, material.rotation );
+			_gl.uniform2fv( uniforms.scale, scale );
+
+			_renderer.setBlending( material.blending, material.blendEquation, material.blendSrc, material.blendDst );
+			_renderer.setDepthTest( material.depthTest );
+			_renderer.setDepthWrite( material.depthWrite );
+
+			if ( material.map && material.map.image && material.map.image.width ) {
+
+				_renderer.setTexture( material.map, 0 );
+
+			} else {
+
+				_renderer.setTexture( _texture, 0 );
+
+			}
+
+			_gl.drawElements( _gl.TRIANGLES, 6, _gl.UNSIGNED_SHORT, 0 );
+
+		}
+
+		// restore gl
+
+		_gl.enable( _gl.CULL_FACE );
+
+	};
+
+	function createProgram () {
+
+		var program = _gl.createProgram();
+
+		var vertexShader = _gl.createShader( _gl.VERTEX_SHADER );
+		var fragmentShader = _gl.createShader( _gl.FRAGMENT_SHADER );
+
+		_gl.shaderSource( vertexShader, [
+
+			'precision ' + _renderer.getPrecision() + ' float;',
+
+			'uniform mat4 modelViewMatrix;',
+			'uniform mat4 projectionMatrix;',
+			'uniform float rotation;',
+			'uniform vec2 scale;',
+			'uniform vec2 uvOffset;',
+			'uniform vec2 uvScale;',
+
+			'attribute vec2 position;',
+			'attribute vec2 uv;',
+
+			'varying vec2 vUV;',
+
+			'void main() {',
+
+				'vUV = uvOffset + uv * uvScale;',
+
+				'vec2 alignedPosition = position * scale;',
+
+				'vec2 rotatedPosition;',
+				'rotatedPosition.x = cos( rotation ) * alignedPosition.x - sin( rotation ) * alignedPosition.y;',
+				'rotatedPosition.y = sin( rotation ) * alignedPosition.x + cos( rotation ) * alignedPosition.y;',
+
+				'vec4 finalPosition;',
+
+				'finalPosition = modelViewMatrix * vec4( 0.0, 0.0, 0.0, 1.0 );',
+				'finalPosition.xy += rotatedPosition;',
+				'finalPosition = projectionMatrix * finalPosition;',
+
+				'gl_Position = finalPosition;',
+
+			'}'
+
+		].join( '\n' ) );
+
+		_gl.shaderSource( fragmentShader, [
+
+			'precision ' + _renderer.getPrecision() + ' float;',
+
+			'uniform vec3 color;',
+			'uniform sampler2D map;',
+			'uniform float opacity;',
+
+			'uniform int fogType;',
+			'uniform vec3 fogColor;',
+			'uniform float fogDensity;',
+			'uniform float fogNear;',
+			'uniform float fogFar;',
+			'uniform float alphaTest;',
+
+			'varying vec2 vUV;',
+
+			'void main() {',
+
+				'vec4 texture = texture2D( map, vUV );',
+
+				'if ( texture.a < alphaTest ) discard;',
+
+				'gl_FragColor = vec4( color * texture.xyz, texture.a * opacity );',
+
+				'if ( fogType > 0 ) {',
+
+					'float depth = gl_FragCoord.z / gl_FragCoord.w;',
+					'float fogFactor = 0.0;',
+
+					'if ( fogType == 1 ) {',
+
+						'fogFactor = smoothstep( fogNear, fogFar, depth );',
+
+					'} else {',
+
+						'const float LOG2 = 1.442695;',
+						'float fogFactor = exp2( - fogDensity * fogDensity * depth * depth * LOG2 );',
+						'fogFactor = 1.0 - clamp( fogFactor, 0.0, 1.0 );',
+
+					'}',
+
+					'gl_FragColor = mix( gl_FragColor, vec4( fogColor, gl_FragColor.w ), fogFactor );',
+
+				'}',
+
+			'}'
+
+		].join( '\n' ) );
+
+		_gl.compileShader( vertexShader );
+		_gl.compileShader( fragmentShader );
+
+		_gl.attachShader( program, vertexShader );
+		_gl.attachShader( program, fragmentShader );
+
+		_gl.linkProgram( program );
+
+		return program;
+
+	};
+
+	function painterSortStable ( a, b ) {
+
+		if ( a.z !== b.z ) {
+
+			return b.z - a.z;
+
+		} else {
+
+			return b.id - a.id;
+
+		}
+
+	};
+
+};
+
+/**
+ * @author alteredq / http://alteredqualia.com/
+ */
+
+THREE.DepthPassPlugin = function () {
+
+	this.enabled = false;
+	this.renderTarget = null;
+
+	var _gl,
+	_renderer,
+	_depthMaterial, _depthMaterialMorph, _depthMaterialSkin, _depthMaterialMorphSkin,
+
+	_frustum = new THREE.Frustum(),
+	_projScreenMatrix = new THREE.Matrix4();
+
+	this.init = function ( renderer ) {
+
+		_gl = renderer.context;
+		_renderer = renderer;
+
+		var depthShader = THREE.ShaderLib[ "depthRGBA" ];
+		var depthUniforms = THREE.UniformsUtils.clone( depthShader.uniforms );
+
+		_depthMaterial = new THREE.ShaderMaterial( { fragmentShader: depthShader.fragmentShader, vertexShader: depthShader.vertexShader, uniforms: depthUniforms } );
+		_depthMaterialMorph = new THREE.ShaderMaterial( { fragmentShader: depthShader.fragmentShader, vertexShader: depthShader.vertexShader, uniforms: depthUniforms, morphTargets: true } );
+		_depthMaterialSkin = new THREE.ShaderMaterial( { fragmentShader: depthShader.fragmentShader, vertexShader: depthShader.vertexShader, uniforms: depthUniforms, skinning: true } );
+		_depthMaterialMorphSkin = new THREE.ShaderMaterial( { fragmentShader: depthShader.fragmentShader, vertexShader: depthShader.vertexShader, uniforms: depthUniforms, morphTargets: true, skinning: true } );
+
+		_depthMaterial._shadowPass = true;
+		_depthMaterialMorph._shadowPass = true;
+		_depthMaterialSkin._shadowPass = true;
+		_depthMaterialMorphSkin._shadowPass = true;
+
+	};
+
+	this.render = function ( scene, camera ) {
+
+		if ( ! this.enabled ) return;
+
+		this.update( scene, camera );
+
+	};
+
+	this.update = function ( scene, camera ) {
+
+		var i, il, j, jl, n,
+
+		program, buffer, material,
+		webglObject, object, light,
+		renderList,
+
+		fog = null;
+
+		// set GL state for depth map
+
+		_gl.clearColor( 1, 1, 1, 1 );
+		_gl.disable( _gl.BLEND );
+
+		_renderer.setDepthTest( true );
+
+		// update scene
+
+		if ( scene.autoUpdate === true ) scene.updateMatrixWorld();
+
+		// update camera matrices and frustum
+
+		camera.matrixWorldInverse.getInverse( camera.matrixWorld );
+
+		_projScreenMatrix.multiplyMatrices( camera.projectionMatrix, camera.matrixWorldInverse );
+		_frustum.setFromMatrix( _projScreenMatrix );
+
+		// render depth map
+
+		_renderer.setRenderTarget( this.renderTarget );
+		_renderer.clear();
+
+		// set object matrices & frustum culling
+
+		renderList = scene.__webglObjects;
+
+		for ( j = 0, jl = renderList.length; j < jl; j ++ ) {
+
+			webglObject = renderList[ j ];
+			object = webglObject.object;
+
+			webglObject.render = false;
+
+			if ( object.visible ) {
+
+				if ( ! ( object instanceof THREE.Mesh || object instanceof THREE.ParticleSystem ) || ! ( object.frustumCulled ) || _frustum.intersectsObject( object ) ) {
+
+					object._modelViewMatrix.multiplyMatrices( camera.matrixWorldInverse, object.matrixWorld );
+
+					webglObject.render = true;
+
+				}
+
+			}
+
+		}
+
+		// render regular objects
+
+		var objectMaterial, useMorphing, useSkinning;
+
+		for ( j = 0, jl = renderList.length; j < jl; j ++ ) {
+
+			webglObject = renderList[ j ];
+
+			if ( webglObject.render ) {
+
+				object = webglObject.object;
+				buffer = webglObject.buffer;
+
+				// todo: create proper depth material for particles
+
+				if ( object instanceof THREE.ParticleSystem && !object.customDepthMaterial ) continue;
+
+				objectMaterial = getObjectMaterial( object );
+
+				if ( objectMaterial ) _renderer.setMaterialFaces( object.material );
+
+				useMorphing = object.geometry.morphTargets.length > 0 && objectMaterial.morphTargets;
+				useSkinning = object instanceof THREE.SkinnedMesh && objectMaterial.skinning;
+
+				if ( object.customDepthMaterial ) {
+
+					material = object.customDepthMaterial;
+
+				} else if ( useSkinning ) {
+
+					material = useMorphing ? _depthMaterialMorphSkin : _depthMaterialSkin;
+
+				} else if ( useMorphing ) {
+
+					material = _depthMaterialMorph;
+
+				} else {
+
+					material = _depthMaterial;
+
+				}
+
+				if ( buffer instanceof THREE.BufferGeometry ) {
+
+					_renderer.renderBufferDirect( camera, scene.__lights, fog, material, buffer, object );
+
+				} else {
+
+					_renderer.renderBuffer( camera, scene.__lights, fog, material, buffer, object );
+
+				}
+
+			}
+
+		}
+
+		// set matrices and render immediate objects
+
+		renderList = scene.__webglObjectsImmediate;
+
+		for ( j = 0, jl = renderList.length; j < jl; j ++ ) {
+
+			webglObject = renderList[ j ];
+			object = webglObject.object;
+
+			if ( object.visible ) {
+
+				object._modelViewMatrix.multiplyMatrices( camera.matrixWorldInverse, object.matrixWorld );
+
+				_renderer.renderImmediateObject( camera, scene.__lights, fog, _depthMaterial, object );
+
+			}
+
+		}
+
+		// restore GL state
+
+		var clearColor = _renderer.getClearColor(),
+		clearAlpha = _renderer.getClearAlpha();
+
+		_gl.clearColor( clearColor.r, clearColor.g, clearColor.b, clearAlpha );
+		_gl.enable( _gl.BLEND );
+
+	};
+
+	// For the moment just ignore objects that have multiple materials with different animation methods
+	// Only the first material will be taken into account for deciding which depth material to use
+
+	function getObjectMaterial( object ) {
+
+		return object.material instanceof THREE.MeshFaceMaterial
+			? object.material.materials[ 0 ]
+			: object.material;
+
+	};
+
+};
+
+
+/**
+ * @author mikael emtinger / http://gomo.se/
+ */
+
+THREE.ShaderFlares = {
+
+	'lensFlareVertexTexture': {
+
+		vertexShader: [
+
+			"uniform lowp int renderType;",
+
+			"uniform vec3 screenPosition;",
+			"uniform vec2 scale;",
+			"uniform float rotation;",
+
+			"uniform sampler2D occlusionMap;",
+
+			"attribute vec2 position;",
+			"attribute vec2 uv;",
+
+			"varying vec2 vUV;",
+			"varying float vVisibility;",
+
+			"void main() {",
+
+				"vUV = uv;",
+
+				"vec2 pos = position;",
+
+				"if( renderType == 2 ) {",
+
+					"vec4 visibility = texture2D( occlusionMap, vec2( 0.1, 0.1 ) );",
+					"visibility += texture2D( occlusionMap, vec2( 0.5, 0.1 ) );",
+					"visibility += texture2D( occlusionMap, vec2( 0.9, 0.1 ) );",
+					"visibility += texture2D( occlusionMap, vec2( 0.9, 0.5 ) );",
+					"visibility += texture2D( occlusionMap, vec2( 0.9, 0.9 ) );",
+					"visibility += texture2D( occlusionMap, vec2( 0.5, 0.9 ) );",
+					"visibility += texture2D( occlusionMap, vec2( 0.1, 0.9 ) );",
+					"visibility += texture2D( occlusionMap, vec2( 0.1, 0.5 ) );",
+					"visibility += texture2D( occlusionMap, vec2( 0.5, 0.5 ) );",
+
+					"vVisibility =        visibility.r / 9.0;",
+					"vVisibility *= 1.0 - visibility.g / 9.0;",
+					"vVisibility *=       visibility.b / 9.0;",
+					"vVisibility *= 1.0 - visibility.a / 9.0;",
+
+					"pos.x = cos( rotation ) * position.x - sin( rotation ) * position.y;",
+					"pos.y = sin( rotation ) * position.x + cos( rotation ) * position.y;",
+
+				"}",
+
+				"gl_Position = vec4( ( pos * scale + screenPosition.xy ).xy, screenPosition.z, 1.0 );",
+
+			"}"
+
+		].join( "\n" ),
+
+		fragmentShader: [
+
+			"uniform lowp int renderType;",
+
+			"uniform sampler2D map;",
+			"uniform float opacity;",
+			"uniform vec3 color;",
+
+			"varying vec2 vUV;",
+			"varying float vVisibility;",
+
+			"void main() {",
+
+				// pink square
+
+				"if( renderType == 0 ) {",
+
+					"gl_FragColor = vec4( 1.0, 0.0, 1.0, 0.0 );",
+
+				// restore
+
+				"} else if( renderType == 1 ) {",
+
+					"gl_FragColor = texture2D( map, vUV );",
+
+				// flare
+
+				"} else {",
+
+					"vec4 texture = texture2D( map, vUV );",
+					"texture.a *= opacity * vVisibility;",
+					"gl_FragColor = texture;",
+					"gl_FragColor.rgb *= color;",
+
+				"}",
+
+			"}"
+		].join( "\n" )
+
+	},
+
+
+	'lensFlare': {
+
+		vertexShader: [
+
+			"uniform lowp int renderType;",
+
+			"uniform vec3 screenPosition;",
+			"uniform vec2 scale;",
+			"uniform float rotation;",
+
+			"attribute vec2 position;",
+			"attribute vec2 uv;",
+
+			"varying vec2 vUV;",
+
+			"void main() {",
+
+				"vUV = uv;",
+
+				"vec2 pos = position;",
+
+				"if( renderType == 2 ) {",
+
+					"pos.x = cos( rotation ) * position.x - sin( rotation ) * position.y;",
+					"pos.y = sin( rotation ) * position.x + cos( rotation ) * position.y;",
+
+				"}",
+
+				"gl_Position = vec4( ( pos * scale + screenPosition.xy ).xy, screenPosition.z, 1.0 );",
+
+			"}"
+
+		].join( "\n" ),
+
+		fragmentShader: [
+
+			"precision mediump float;",
+
+			"uniform lowp int renderType;",
+
+			"uniform sampler2D map;",
+			"uniform sampler2D occlusionMap;",
+			"uniform float opacity;",
+			"uniform vec3 color;",
+
+			"varying vec2 vUV;",
+
+			"void main() {",
+
+				// pink square
+
+				"if( renderType == 0 ) {",
+
+					"gl_FragColor = vec4( texture2D( map, vUV ).rgb, 0.0 );",
+
+				// restore
+
+				"} else if( renderType == 1 ) {",
+
+					"gl_FragColor = texture2D( map, vUV );",
+
+				// flare
+
+				"} else {",
+
+					"float visibility = texture2D( occlusionMap, vec2( 0.5, 0.1 ) ).a;",
+					"visibility += texture2D( occlusionMap, vec2( 0.9, 0.5 ) ).a;",
+					"visibility += texture2D( occlusionMap, vec2( 0.5, 0.9 ) ).a;",
+					"visibility += texture2D( occlusionMap, vec2( 0.1, 0.5 ) ).a;",
+					"visibility = ( 1.0 - visibility / 4.0 );",
+
+					"vec4 texture = texture2D( map, vUV );",
+					"texture.a *= opacity * visibility;",
+					"gl_FragColor = texture;",
+					"gl_FragColor.rgb *= color;",
+
+				"}",
+
+			"}"
+
+		].join( "\n" )
+
+	}
+
+};
+
